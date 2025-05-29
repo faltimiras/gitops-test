@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - master
+      - main
 
 jobs:
   run-script:
@@ -15,4 +15,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run script.sh
-        run: bash ./script.sh
+        run: bash ./script.sh values.yaml
