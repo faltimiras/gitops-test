@@ -16,3 +16,5 @@ jobs:
 
       - name: Run script.sh
         run: bash ./script.sh values.yaml
+        env:
+          API_KEY: ${{ secrets.NR_API_KEY }}

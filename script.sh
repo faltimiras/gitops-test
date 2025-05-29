@@ -15,4 +15,4 @@ if [ ! -f "$FILE_PATH" ]; then
   exit 2
 fi
 
-curl -X POST "$ENDPOINT_URL" --data-binary @"$FILE_PATH" -H "Content-Type: text/plain"
+curl -X POST "$ENDPOINT_URL" --data-binary @"$FILE_PATH" -H "Content-Type: text/plain" -H "Api-Key:$API_KEY"
