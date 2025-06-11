@@ -1,0 +1,7 @@
+---
+configurations:
+  - name: something here descriptive
+    fleetGuid: abcd
+    files:
+      - someDir/file1.txt
+
