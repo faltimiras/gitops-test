@@ -16,18 +16,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Get changed files
-        id: files
-        run: |
-          git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.merge_commit_sha }} > changed_files.txt
-          cat changed_files.txt
-
-      - name: Output changed files
-        run: |
-          echo "Changed files:"
-          cat changed_files.txt
-
       - name: Run script.sh
-        run: bash ./script.sh changed_files.txt
+        run: bash ./script.sh ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.merge_commit_sha }}
         env:
           API_KEY: ${{ secrets.NR_API_KEY }}
