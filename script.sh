@@ -44,10 +44,10 @@ echo "Config: $CONFIG_NAME, Fleet: $FLEET_ID, Org id: $ORG_ID, Agent type: $AGEN
 
 #find if config is new or already exit
 CONFIG_RS=$(curl $NERDGRAPH \
+  -s -X POST \
   -H "Api-Key: $API_KEY" \
   -H 'NewRelic-Requesting-Services: NR_CONTROL' \
   -H 'content-type: application/json' \
-  -s -X POST \
   --data-raw $'{"query": "{ actor { entitySearch ( query: \\" domain = '\''NGEP'\'' and type = '\''AGENT_CONFIGURATION'\'' and name = '\'''$CONFIG_NAME''\'' \") {results {entities { guid } } count }}}"}')
 
 COUNT=$(jq '.data.actor.entitySearch.count' <<< "$CONFIG_RS")
@@ -85,10 +85,10 @@ sleep 10 #We need to wait some time, to give time EP to process the config versi
 
 #Create deployment entity
 DEPLOYMENT_RS=$(curl $NERDGRAPH \
+  -s -X POST \
   -H "Api-Key: $API_KEY" \
   -H 'NewRelic-Requesting-Services: NR_CONTROL' \
   -H 'content-type: application/json' \
-  -s -X POST \
   --data-raw $'{"query":"mutation FleetV2CreateDeployment($name:String!$description:String$fleetGuid:ID!$configurationVersionList:[EntityManagementDeploymentAgentConfigurationVersionCreateInput]$scopeId:ID!$scopeType:EntityManagementEntityScope!){entityManagementCreateFleetDeployment(fleetDeploymentEntity:{name:$name description:$description fleetId:$fleetGuid configurationVersionList:$configurationVersionList scope:{id:$scopeId type:$scopeType}}){entity{id}}}","variables":{"scopeId":"'"$ORG_ID"'","scopeType":"ORGANIZATION","name":"git-ops '"$(date)"'","description":"","fleetGuid":"'"$FLEET_ID"'","configurationVersionList":[{"id":"'"$CONFIG_VERSION_ID"'"}]}}')
 
 DEPLOYMENT_ID=$(jq -r '.data.entityManagementCreateFleetDeployment.entity.id' <<< "$DEPLOYMENT_RS")
@@ -100,10 +100,10 @@ echo "Deployment id: $DEPLOYMENT_ID"
 
 #Trigger deployment 
 DEPLOY_RS=$(curl $NERDGRAPH \
+  -s -X POST \
   -H "Api-Key: $API_KEY" \
   -H 'NewRelic-Requesting-Services: NR_CONTROL' \
   -H 'content-type: application/json; charset=utf-8' \
-  -s -X POST \
   --data-raw $'{"query":"mutation deployFleet($deploymentId:ID!$fleetGuid:ID!$policy:[String!]){fleetControlDeployFleet(deploymentId:$deploymentId fleetId:$fleetGuid policy:{ringDeploymentPolicy:{ringsToDeploy:$policy}}){fleetGuid}}","variables":{"deploymentId":"'"$DEPLOYMENT_ID"'","fleetGuid":"'"$FLEET_ID"'","policy":["canary","default"]}}')
   
 echo "Done \o/"
