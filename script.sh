@@ -1,31 +1,99 @@
 #!/bin/bash
 
 # Usage: ./script.sh <commit 1> <commit2>
-ENDPOINT_URL="http://ptsv3.com/t/alti-git-ops-test/post/"
+# ENDPOINT_URL="http://ptsv3.com/t/alti-git-ops-test/post/"
+DEPLOYMENT_METADATA_FILE="./deployment_config.yml"
+NERDGRAPH=https://staging-api.newrelic.com/graphql
+BLOB_API=https://blob-api.staging-service.newrelic.com
+
+
+get_config_by_name() {
+  VALUE=$(yq -r '
+    .configurations[]
+    | select(.files[] == "'$2'")
+    | .'$1'
+  ' "$DEPLOYMENT_METADATA_FILE")
+  echo "$VALUE"
+}
+
 
 if [ $# -ne 2 ]; then
   echo "Usage: $0 <commit 1> <commit2>"
   exit 1
 fi
 
-
-git diff --name-only $1 $2 > changed_files.txt
-
-
-YAML_FILE="./deployment_config.yml"
-TARGET_FILE=$(cat changed_files.txt)
-
+#Get files that changed between the 2 commits
+#NOW IT ONLY SUPPORTS ONE PR WITH 1 FILE!!!!
+TARGET_FILE=$(git diff --name-only $1 $2)
 echo $TARGET_FILE
-export TARGET_FILE
 
-FLEET_GUID=$(yq -r '
- .configurations[]
-  | select(.files[] == env(TARGET_FILE))
-  | .fleetGuid
-' "$YAML_FILE")
 
-echo $FLEET_GUID
+#Extracting configuration metadata if exist
+FLEET_ID=$(get_config_by_name "fleetId" "$TARGET_FILE")
 
-curl -X POST "$ENDPOINT_URL" --data-binary @"$TARGET_FILE" -H "Content-Type: text/plain" -H "Api-Key:$API_KEY" -H "fleetGuid:$FLEET_GUID"
+if [[ -z "$FLEET_ID" ]]; then
+  echo "No configurations detected. Nothing to do"
+  exit 0
+fi
 
-rm changed_files.txt
+ORG_ID=$(get_config_by_name "orgId" "$TARGET_FILE")
+AGENT_TYPE=$(get_config_by_name "agentType" "$TARGET_FILE")
+MANAGED_ENTITY_TYPE=$(get_config_by_name "managedEntityType" "$TARGET_FILE")
+CONFIG_NAME=$(get_config_by_name "name" "$TARGET_FILE")
+echo "Config: $CONFIG_NAME, Fleet: $FLEET_ID, Org id: $ORG_ID, Agent type: $AGENT_TYPE, Manatee type: $MANAGED_ENTITY_TYPE"
+
+
+#Upload config version
+########
+######## agenConfig GUID is 'alti' config entity guid -> THIS IS HARDCODED FOR TESTING, NEED TO BE OBTAINED FROM API
+########
+
+CONFIG_VERSION_RS=$(curl "$BLOB_API/v1/e/organizations/$ORG_ID/AgentConfigurations" \
+ -s -X POST \
+ --data-binary @"$TARGET_FILE" \
+ -H "Content-Type: plain/text" \
+ -H "Api-Key:$API_KEY" \
+ -H "newrelic-entity:{\"agentConfiguration\": \"MTIyMTA0NzV8TkdFUHxBR0VOVF9DT05GSUdVUkFUSU9OfDAxOTc2MDBiLWRmMTAtNzFkYS05NjFhLTE3ODhjZWY0ODE2ZA\"}")
+
+CONFIG_VERSION_ID=$(jq -r '.blobVersionEntity.entityGuid' <<< "$CONFIG_VERSION_RS")
+if [[ -z "$CONFIG_VERSION_ID" ]]; then
+  echo "Config version response: $CONFIG_VERSION_RS"
+  exit 1
+fi
+echo "Config version id: $CONFIG_VERSION_ID"
+
+
+CONFIG_VERSION_ID=MTIyMTA0NzV8TkdFUHxBR0VOVF9DT05GSUdVUkFUSU9OX1ZFUlNJT058MDE5NzYzOGQtYzlhMS03MDcwLTliNzEtZjliMjdjZDVkMTRl
+
+
+#Create deployment entity
+DEPLOYMENT_RS=$(curl $NERDGRAPH \
+  -H "Api-Key: $API_KEY" \
+  -H 'NewRelic-Requesting-Services: NR_CONTROL' \
+  -H 'content-type: application/json' \
+  -s -X POST \
+  --data-raw $'{"query":"mutation FleetV2CreateDeployment($name:String!$description:String$fleetGuid:ID!$configurationVersionList:[EntityManagementDeploymentAgentConfigurationVersionCreateInput]$scopeId:ID!$scopeType:EntityManagementEntityScope!){entityManagementCreateFleetDeployment(fleetDeploymentEntity:{name:$name description:$description fleetId:$fleetGuid configurationVersionList:$configurationVersionList scope:{id:$scopeId type:$scopeType}}){entity{id}}}","variables":{"scopeId":"'"$ORG_ID"'","scopeType":"ORGANIZATION","name":"git-ops '"$(date)"'","description":"","fleetGuid":"'"$FLEET_ID"'","configurationVersionList":[{"id":"'"$CONFIG_VERSION_ID"'"}]}}')
+ 
+DEPLOYMENT_ID=$(jq -r '.data.entityManagementCreateFleetDeployment.entity.id' <<< "$DEPLOYMENT_RS")
+if [[ -z "$DEPLOYMENT_ID" ]]; then
+  echo "Deployment response: $DEPLOYMENT_RS"
+  exit 1
+fi
+echo "Deployment id: $DEPLOYMENT_ID"
+
+#Trigger deployment 
+DEPLOY_RS=$(curl $NERDGRAPH \
+  -H "Api-Key: $API_KEY" \
+  -H 'NewRelic-Requesting-Services: NR_CONTROL' \
+  -H 'content-type: application/json; charset=utf-8' \
+  -s -X POST \
+  --data-raw $'{"query":"mutation deployFleet($deploymentId:ID!$fleetGuid:ID!$policy:[String!]){fleetControlDeployFleet(deploymentId:$deploymentId fleetId:$fleetGuid policy:{ringDeploymentPolicy:{ringsToDeploy:$policy}}){fleetGuid}}","variables":{"deploymentId":"'"$DEPLOYMENT_ID"'","fleetGuid":"'"$FLEET_ID"'","policy":["canary","default"]}}')
+  
+echo "BOOOOOOM"
+
+
+
+
+
+
+#curl -X POST "$ENDPOINT_URL" --data-binary @"$TARGET_FILE" -H "Content-Type: application/json" -H "Api-Key:$API_KEY" -H "newrelic-entity : {\"name\": \"$CONFIG_NAME\", \"agentType\": \"$AGENT_TYPE\", \"managedEntityType\": \"$MANAGED_ENTITY_TYPE\"}"

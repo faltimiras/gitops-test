@@ -1,7 +1,10 @@
 ---
 configurations:
-  - name: something here descriptive
-    fleetGuid: abcd
+  - name: alti-git-ops-test
+    fleetId: MTIyMTA0NzV8TkdFUHxGTEVFVHwwMTk3NWUzYS0xMGU0LTc1NDAtYTMxZS02ZjdiMGEwMjBjOWI
+    agentType: NRInfra
+    managedEntityType: KUBERNETESCLUSTER
+    orgId: 0da0a58a-2d3d-4a0c-8f39-3060bb6cf944
     files:
       - someDir/file1.txt
 
