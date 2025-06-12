@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Please check the document below to learn more #https://docs.newrelic.com/docs/kubernetes-pixie/kubernetes-integration/get-started/introduction-kubernetes-integration/ 
 
 
@@ -604,6 +603,3 @@ chart_values:
   # -- (bool) Sets the debug logs to this integration or all integrations if it is set globally. Can be configured also with `global.verboseLog`
   # @default -- `false`
   verboseLog:
-=======
-this is a file 5
->>>>>>> cfaf13cae5d3feb2058347df2fadc3f6118678cf
