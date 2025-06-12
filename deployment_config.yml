@@ -1,6 +1,6 @@
 ---
 configurations:
-  - name: alti-git-ops-test
+  - name: alti
     fleetId: MTIyMTA0NzV8TkdFUHxGTEVFVHwwMTk3NWUzYS0xMGU0LTc1NDAtYTMxZS02ZjdiMGEwMjBjOWI
     agentType: NRInfra
     managedEntityType: KUBERNETESCLUSTER

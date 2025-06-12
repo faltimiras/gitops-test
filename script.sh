@@ -33,7 +33,7 @@ FLEET_ID=$(get_config_by_name "fleetId" "$TARGET_FILE")
 
 if [[ -z "$FLEET_ID" ]]; then
   echo "No configurations detected. Nothing to do"
-  exit 0
+  exit 1
 fi
 
 ORG_ID=$(get_config_by_name "orgId" "$TARGET_FILE")
@@ -42,25 +42,46 @@ MANAGED_ENTITY_TYPE=$(get_config_by_name "managedEntityType" "$TARGET_FILE")
 CONFIG_NAME=$(get_config_by_name "name" "$TARGET_FILE")
 echo "Config: $CONFIG_NAME, Fleet: $FLEET_ID, Org id: $ORG_ID, Agent type: $AGENT_TYPE, Manatee type: $MANAGED_ENTITY_TYPE"
 
+#find if config is new or already exit
+CONFIG_RS=$(curl $NERDGRAPH \
+  -H "Api-Key: $API_KEY" \
+  -H 'NewRelic-Requesting-Services: NR_CONTROL' \
+  -H 'content-type: application/json' \
+  -s -X POST \
+  --data-raw $'{"query": "{ actor { entitySearch ( query: \\" domain = '\''NGEP'\'' and type = '\''AGENT_CONFIGURATION'\'' and name = '\'''$CONFIG_NAME''\'' \") {results {entities { guid } } count }}}"}')
+
+COUNT=$(jq '.data.actor.entitySearch.count' <<< "$CONFIG_RS")
+if [ -z "$COUNT" ]; then
+  echo "Error: $CONFIG_RS"
+  exit 1
+elif [ "$COUNT" -eq 0 ]; then
+  echo "No entity created with this name. Creating..."
+  #TODO create entity
+elif [ "$COUNT" -eq 1 ]; then
+    CONFIG_ID=$(jq -r '.data.actor.entitySearch.results.entities[0].guid' <<< "$CONFIG_RS")
+    echo "Config id: $CONFIG_ID"
+else
+  echo "More than one entity with this name. Not supported"
+  exit 1
+fi
+
 
 #Upload config version
-########
-######## agenConfig GUID is 'alti' config entity guid -> THIS IS HARDCODED FOR TESTING, NEED TO BE OBTAINED FROM API
-########
-
 CONFIG_VERSION_RS=$(curl "$BLOB_API/v1/e/organizations/$ORG_ID/AgentConfigurations" \
  -s -X POST \
- --data-binary @"$TARGET_FILE" \
  -H "Content-Type: plain/text" \
  -H "Api-Key:$API_KEY" \
- -H "newrelic-entity:{\"agentConfiguration\": \"MTIyMTA0NzV8TkdFUHxBR0VOVF9DT05GSUdVUkFUSU9OfDAxOTc2MDBiLWRmMTAtNzFkYS05NjFhLTE3ODhjZWY0ODE2ZA\"}")
+ -H "newrelic-entity:{\"agentConfiguration\": \"$CONFIG_ID\"}" \
+ --data-binary @"$TARGET_FILE" )
 
 CONFIG_VERSION_ID=$(jq -r '.blobVersionEntity.entityGuid' <<< "$CONFIG_VERSION_RS")
-if [[ -z "$CONFIG_VERSION_ID" ]]; then
-  echo "Config version response: $CONFIG_VERSION_RS"
+if [ -z "$CONFIG_VERSION_ID" ] || [ "$CONFIG_VERSION_ID" = "null" ]; then
+  echo "Error: Config version response: $CONFIG_VERSION_RS"
   exit 1
 fi
 echo "Config version id: $CONFIG_VERSION_ID"
+
+sleep 10 #We need to wait some time, to give time EP to process the config version async
 
 #Create deployment entity
 DEPLOYMENT_RS=$(curl $NERDGRAPH \
@@ -69,10 +90,10 @@ DEPLOYMENT_RS=$(curl $NERDGRAPH \
   -H 'content-type: application/json' \
   -s -X POST \
   --data-raw $'{"query":"mutation FleetV2CreateDeployment($name:String!$description:String$fleetGuid:ID!$configurationVersionList:[EntityManagementDeploymentAgentConfigurationVersionCreateInput]$scopeId:ID!$scopeType:EntityManagementEntityScope!){entityManagementCreateFleetDeployment(fleetDeploymentEntity:{name:$name description:$description fleetId:$fleetGuid configurationVersionList:$configurationVersionList scope:{id:$scopeId type:$scopeType}}){entity{id}}}","variables":{"scopeId":"'"$ORG_ID"'","scopeType":"ORGANIZATION","name":"git-ops '"$(date)"'","description":"","fleetGuid":"'"$FLEET_ID"'","configurationVersionList":[{"id":"'"$CONFIG_VERSION_ID"'"}]}}')
- 
+
 DEPLOYMENT_ID=$(jq -r '.data.entityManagementCreateFleetDeployment.entity.id' <<< "$DEPLOYMENT_RS")
-if [[ -z "$DEPLOYMENT_ID" ]]; then
-  echo "Deployment response: $DEPLOYMENT_RS"
+if [ -z "$DEPLOYMENT_ID" ] || [ "$DEPLOYMENT_ID" = "null" ]; then
+  echo "Error: Deployment response: $DEPLOYMENT_RS"
   exit 1
 fi
 echo "Deployment id: $DEPLOYMENT_ID"
@@ -85,11 +106,4 @@ DEPLOY_RS=$(curl $NERDGRAPH \
   -s -X POST \
   --data-raw $'{"query":"mutation deployFleet($deploymentId:ID!$fleetGuid:ID!$policy:[String!]){fleetControlDeployFleet(deploymentId:$deploymentId fleetId:$fleetGuid policy:{ringDeploymentPolicy:{ringsToDeploy:$policy}}){fleetGuid}}","variables":{"deploymentId":"'"$DEPLOYMENT_ID"'","fleetGuid":"'"$FLEET_ID"'","policy":["canary","default"]}}')
   
-echo "BOOOOOOM"
-
-
-
-
-
-
-#curl -X POST "$ENDPOINT_URL" --data-binary @"$TARGET_FILE" -H "Content-Type: application/json" -H "Api-Key:$API_KEY" -H "newrelic-entity : {\"name\": \"$CONFIG_NAME\", \"agentType\": \"$AGENT_TYPE\", \"managedEntityType\": \"$MANAGED_ENTITY_TYPE\"}"
+echo "Done \o/"
