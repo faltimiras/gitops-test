@@ -25,7 +25,7 @@ fi
 #Get files that changed between the 2 commits
 #NOW IT ONLY SUPPORTS ONE PR WITH 1 FILE!!!!
 TARGET_FILE=$(git diff --name-only $1 $2)
-echo $TARGET_FILE
+echo "Files changed: $TARGET_FILE"
 
 
 #Extracting configuration metadata if exist
