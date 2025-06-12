@@ -62,10 +62,6 @@ if [[ -z "$CONFIG_VERSION_ID" ]]; then
 fi
 echo "Config version id: $CONFIG_VERSION_ID"
 
-
-CONFIG_VERSION_ID=MTIyMTA0NzV8TkdFUHxBR0VOVF9DT05GSUdVUkFUSU9OX1ZFUlNJT058MDE5NzYzOGQtYzlhMS03MDcwLTliNzEtZjliMjdjZDVkMTRl
-
-
 #Create deployment entity
 DEPLOYMENT_RS=$(curl $NERDGRAPH \
   -H "Api-Key: $API_KEY" \
