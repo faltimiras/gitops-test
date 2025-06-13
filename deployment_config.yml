@@ -1,10 +1,10 @@
 ---
 configurations:
-  - name: alti
-    fleetId: MTIyMTA0NzV8TkdFUHxGTEVFVHwwMTk3NWUzYS0xMGU0LTc1NDAtYTMxZS02ZjdiMGEwMjBjOWI
+  - name: alti-infra-1
+    fleetId: NjQyNTg2NXxOR0VQfEZMRUVUfDAxOTcxYzdlLWM4ZmMtNzg5NS04NDYwLTRiMGY4NWIxZTE5Ng
     agentType: NRInfra
     managedEntityType: KUBERNETESCLUSTER
-    orgId: 0da0a58a-2d3d-4a0c-8f39-3060bb6cf944
+    orgId: b961cf81-d62b-4359-8822-7b1d6dadd374
     files:
-      - someDir/file1.txt
+      - someDir/values.yml
 

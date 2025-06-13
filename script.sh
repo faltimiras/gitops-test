@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # Usage: ./script.sh <commit 1> <commit2>
-# ENDPOINT_URL="http://ptsv3.com/t/alti-git-ops-test/post/"
 DEPLOYMENT_METADATA_FILE="./deployment_config.yml"
-NERDGRAPH=https://staging-api.newrelic.com/graphql
-BLOB_API=https://blob-api.staging-service.newrelic.com
+NERDGRAPH=https://api.newrelic.com/graphql
+BLOB_API=https://blob-api.service.newrelic.com
 
 
 get_config_by_name() {
